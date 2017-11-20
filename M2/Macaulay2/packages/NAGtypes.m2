@@ -2,8 +2,8 @@
 -- licensed under GPL v2 or any later version
 newPackage(
      "NAGtypes",
-     Version => "1.9.2",
-     Date => "Oct 2016",
+     Version => "1.9.3",
+     Date => "May 2017",
      Headline => "Common types used in Numerical Algebraic Geometry",
      HomePage => "http://people.math.gatech.edu/~aleykin3/NAG4M2",
      Authors => {
@@ -112,6 +112,17 @@ XXXtoList PolySystem := P -> if P.?PolyMap then flatten entries P.PolyMap else e
 homogenize (PolySystem,Ring,RingElement) := (P,R,h) -> polySystem homogenize(sub(P.PolyMap,R),h)
 isSquare = method()
 isSquare PolySystem := P -> P.NumberOfPolys == P.NumberOfVariables
+
+toCCpolynomials = method()
+toCCpolynomials (List,ZZ) := (F,prec) -> (
+    R := CC_prec(monoid[gens commonRing F]);
+    apply(F,f->sub(f,R)) 
+    )    
+toCCpolynomials (Matrix,InexactField) := (F,C) -> (
+    R := C(monoid[gens ring F]);
+    sub(F,R) 
+    )    
+
 evaluate = method()
 evaluate (PolySystem,Point) := (P,p) -> evaluate(P, matrix p)
 evaluate (Matrix,Point) := (M,p) -> evaluate(M, matrix p)
@@ -122,8 +133,11 @@ evaluate (PolySystem,Matrix) := (P,X) -> (
     )    
 evaluate (Matrix,Matrix) := (M,X) ->  (
     C := coefficientRing ring M;
-    if numColumns X == 1 then sub(M,sub(transpose X,C))
-    else if numRows X == 1 then sub(M,sub(X,C))
+    -- work around a sub(CC,QQ) bug!!!
+    if instance(ring X, InexactField) then 
+	M = toCCpolynomials(M,C=ring X);   
+    if numColumns X == 1 then X = transpose X;
+    if numRows X == 1 then sub(M,sub(X,C))
     else error "expected a row or a column vector"
     )
 evaluate (PolySystem,Point) := (P,p) -> evaluate(P,matrix p)
@@ -279,7 +293,7 @@ sortSolutionsWithWeights (List, List) := (sols,w) -> (
     sols_sortedCols
     ) 
 
-{*
+-*
 sortSolutionsWithWeights = method()
 sortSolutionsWithWeights (List, List) := (sols,w) -> (
     n := #coordinates first sols;
@@ -295,7 +309,7 @@ sortSolutionsWithWeights (List, List) := (sols,w) -> (
     time sortedCols := sortColumns L;
     time sols_sortedCols
     ) 
-*}
+*-
 
 sortSolutions = method(TypicalValue=>List, Options=>{Tolerance=>1e-6,Weights=>null})
 sortSolutions List := o -> sols -> (
@@ -397,7 +411,7 @@ TEST ///
     assert(A - B == {{{1, 3}}, {{1+ii, 3}}, {{2, 5}}}/point//pointSet)
 ///
 
-{* not exported. obsolete?
+-* not exported. obsolete?
 
 diffSolutions = method(TypicalValue=>Sequence, Options=>{Tolerance=>1e-3})
 -- in:  A, B (presumably sorted)
@@ -412,7 +426,7 @@ diffSolutions (List,List) := o -> (A,B) -> (
      (a|toList(i..#A-1),b|toList(j..#B-1))	      	    
      )
 
-*}
+*-
 
 toAffineChart = method() -- coordinates of the point (x_0:...:x_n) in the k-th affine chart
 toAffineChart (ZZ,List) := List => (k,x) -> (
@@ -605,7 +619,7 @@ slice W
 assert (dim W == 1 and degree W ==3)
 ///
 
-{**********************************************************************
+-**********************************************************************
 NumericalVariety = {
      0 => list of (irreducible) witness sets
      1 => list of (irreducible) witness sets
@@ -620,7 +634,7 @@ SERVICE FUNCTIONS:
   isReduced
   NumericalVariety union NumericalVariety (binary)
   
-*}
+*-
 NumericalVariety.synonym = "numerical variety"
 ProjectiveNumericalVariety.synonym = "projective numerical variety"
 net NumericalVariety := V -> (
@@ -701,6 +715,11 @@ checkCCpolynomials List := F -> (
 	or coeffR===QQ or coeffR ===ZZ
 	) then error "expected coefficients that can be converted to complex numbers";  
     if any(F, f->ring f =!= R) then error "expected all polynomials in the same ring";
+    )
+checkCCpolynomials (List,List) := (S,T) -> (
+    n := #T;
+    if #S != n then error "expected same number of polynomials in start and target systems";
+    ST := checkCCpolynomials(S|T);
     )
 
 generalEquations = method()
@@ -895,13 +914,13 @@ document {
        coordinates pt
        status pt
      ///,
-     {* condition number is not computed by default anymore !!!
+     -* condition number is not computed by default anymore !!!
      PARA{"For example, one may see the condition number of the Jacobian of the polynomial system, evaluated at this point
       (the smaller the value, the better) as follows."},
      EXAMPLE lines ///
        pt.ConditionNumber
      ///,
-     *}
+     *-
      PARA{"The other keys that may be attached include "}, 
      UL{
 	  {TO NumberOfSteps, " -- the number of steps in made by the continuation procedure"}, 
@@ -1189,14 +1208,14 @@ document {
 	 {TT "PolyMap", " of type ", TO Matrix, ", a column matrix over a polynomial ring"},
     	 {TT "Jacobian", " of type ", TO Matrix, ", the jacobian of ", TT "PolyMap"},
 	 },
-{*     "Basic methods for ", TO "polynomial homotopy", " use additional keys: ",
+-*     "Basic methods for ", TO "polynomial homotopy", " use additional keys: ",
      UL {
 	 {TT "ContinuationParameter", " -- stores one variable of the ring" },
 	 {TT "SpecializationRing", 
 	     " -- stores the subring generated my all variables except the additional parameter",
 	     " (e.g., used by ", TO specializeContinuationParameter, ")"}
 	 },
-     *}
+     *-
      EXAMPLE lines ///
 CC[x,y]
 S = polySystem {x^2+y^2-6, 2*x^2-y}
@@ -1320,7 +1339,7 @@ ring T
     SeeAlso => {homogenize,PolySystem}
     }
 
-{*
+-*
 document {
     Key => {"polynomial homotopy", 
 	segmentHomotopy, (segmentHomotopy,PolySystem,PolySystem), 
@@ -1362,7 +1381,7 @@ H' := substituteContinuationParameter(H,1-t)
     ///,    
     SeeAlso => {ContinuationParameter,SpecializationRing}
     }
-*}
+*-
 -- WitnessSet ------------------------------------------------------------------------------
 document {
      Key => {WitnessSet,equations,(equations,WitnessSet),slice,(slice,WitnessSet),
